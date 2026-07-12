@@ -1,10 +1,7 @@
 import sqlite3
 from mcp.server.fastmcp import FastMCP
-
-# 1. MCP 서버 초기화
 mcp = FastMCP("YukA-Log-Server")
 
-# 2. SQLite DB 초기화
 def init_db():
     conn = sqlite3.connect("yukalog.db")
     cursor = conn.cursor()
@@ -17,7 +14,6 @@ def init_db():
 
 init_db()
 
-# [MCP 도구들 정의]
 @mcp.tool()
 def record_feeding(baby_id: str, time: str, amount_ml: int) -> str:
     conn = sqlite3.connect("yukalog.db")
