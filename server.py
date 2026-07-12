@@ -1,11 +1,8 @@
 import sqlite3
-from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
 from mcp.server.fastmcp import FastMCP
 
-# 1. MCP 및 FastAPI 초기화
+# 1. MCP 서버 초기화
 mcp = FastMCP("YukA-Log-Server")
-app = FastAPI(title="YukA-Log-Server-Wrapper")
 
 # 2. SQLite DB 초기화
 def init_db():
@@ -20,7 +17,7 @@ def init_db():
 
 init_db()
 
-# [MCP Tools 정의]
+# [MCP 도구들 정의]
 @mcp.tool()
 def record_feeding(baby_id: str, time: str, amount_ml: int) -> str:
     conn = sqlite3.connect("yukalog.db")
@@ -46,7 +43,7 @@ def record_growth(baby_id: str, event: str, weight_kg: float = 0.0) -> str:
     cursor.execute("INSERT INTO growth (baby_id, event, weight) VALUES (?, ?, ?)", (baby_id, event, weight_kg))
     conn.commit()
     conn.close()
-    return f"[육아로그] 아기({baby_id}) 성장 이벤트 '{event}' 기록 완료 (체중: {weight_kg}kg)"
+    return f"[육아로그] 아기({baby_id}) 성장 이벤트 '{event}' 기록 완료"
 
 @mcp.tool()
 def record_vaccination(baby_id: str, vaccine_type: str, status: str = "완료", next_schedule: str = "") -> str:
@@ -55,7 +52,7 @@ def record_vaccination(baby_id: str, vaccine_type: str, status: str = "완료", 
     cursor.execute("INSERT INTO vaccination (baby_id, vaccine_type, status, next_schedule) VALUES (?, ?, ?, ?)", (baby_id, vaccine_type, status, next_schedule))
     conn.commit()
     conn.close()
-    return f"[육아로그] {vaccine_type} 접종 완료 (다음 예정일: {next_schedule})"
+    return f"[육아로그] {vaccine_type} 접종 완료"
 
 @mcp.tool()
 def get_co_parenting_summary(baby_id: str) -> str:
@@ -67,26 +64,7 @@ def get_co_parenting_summary(baby_id: str) -> str:
     conn.close()
     return f"[공동 육아 브리핑] 오늘 수유: {feed_count}회 / 총 {total_feed}ml"
 
-# 3. 카카오 시스템 연동을 위한 라우팅 강제 설정
-@app.get("/")
-@app.get("/health")
-def health_check():
-    """카카오의 서버 생존 확인(Health Check)에 응답하는 경로"""
-    return {"status": "healthy", "mcp_server": "active"}
-
-# FastMCP의 HTTP 통신 진입점을 FastAPI 웹 주소에 강제로 이식
-from mcp.server.fastmcp.transport.sse import ASMGSSETransport
-sse_transport = ASMGSSETransport(mcp)
-
-@app.get("/sse")
-async def handle_sse_connect(request: Request):
-    return await sse_transport.handle_connect(request)
-
-@app.post("/sse")
-async def handle_sse_message(request: Request):
-    return await sse_transport.handle_message(request)
-
 if __name__ == "__main__":
-    import uvicorn
-    # 카카오가 요구하는 0.0.0.0 주소와 8000 포트로 웹 서버 구동
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    # FastMCP 가 제공하는 순정 내장 HTTP 서버를 활용하여 8000포트로 구동합니다.
+    # 이렇게 하면 카카오의 / 및 /sse 요청을 표준 규격대로 깔끔하게 처리합니다.
+    mcp.run(transport="http", host="0.0.0.0", port=8000)
